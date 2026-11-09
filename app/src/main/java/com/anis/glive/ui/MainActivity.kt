@@ -34,6 +34,7 @@ import com.anis.glive.data.LoadState
 import com.anis.glive.data.Movie
 import com.anis.glive.data.Program
 import com.anis.glive.data.Series
+import kotlinx.coroutines.launch
 
 sealed class Route {
     data object Home : Route()
@@ -117,6 +118,7 @@ fun App() {
             )
             is LoadState.Ready -> CompositionLocalProvider(LocalNav provides nav) {
                 BackHandler(enabled = nav.stack.size > 1) { nav.pop() }
+                UpdateCheck()
                 when (val r = nav.stack.last()) {
                     is Route.Home -> HomeScreen(onLogout = { repo.logout(); nav.stack.clear(); nav.stack.add(Route.Home); loggedIn = false })
                     is Route.Live -> PlayerScreen(PlayerMode.Live(r.channels, r.index))
@@ -170,5 +172,44 @@ fun CrashScreen(text: String, onContinue: () -> Unit) {
         Text("Prends cet écran en photo et envoie-la à Claude, puis appuie sur OK.", style = T.body)
         Button(onClick = onContinue, modifier = Modifier.focusRequester(fr), colors = true) { Text("OK, continuer") }
         Text(text.take(2500), style = T.small.copy(fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp)), color = C.text2)
+    }
+}
+
+/** Vérifie au démarrage s'il existe une nouvelle version et propose de l'installer en un clic. */
+@Composable
+fun UpdateCheck() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var release by remember { mutableStateOf<com.anis.glive.data.Release?>(null) }
+    var progress by remember { mutableStateOf<String?>(null) }
+    var dismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(4000)
+        release = com.anis.glive.data.Updater.latest()?.takeIf { com.anis.glive.data.Updater.isNewer(it) }
+    }
+    val r = release ?: return
+    if (dismissed) return
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(r) { kotlinx.coroutines.delay(100); runCatching { fr.requestFocus() } }
+    BackHandler { dismissed = true }
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xB3000000)), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.background(C.surface, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Nouvelle version disponible", style = T.h1)
+            Text("${r.name} est prête. L'installation prend quelques secondes, tes réglages sont gardés.", style = T.body)
+            progress?.let { Text(it, style = T.small) }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = {
+                    scope.launch {
+                        progress = "Téléchargement…"
+                        val ok = com.anis.glive.data.Updater.downloadAndInstall(context, r) { p -> progress = "Téléchargement ${(p * 100).toInt()} %" }
+                        progress = if (ok) "Confirme l'installation sur l'écran suivant." else "Échec du téléchargement, réessaie plus tard."
+                    }
+                }, modifier = Modifier.focusRequester(fr), colors = true) { Text("Installer maintenant") }
+                Button(onClick = { dismissed = true }) { Text("Plus tard") }
+            }
+        }
     }
 }
