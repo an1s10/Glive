@@ -64,6 +64,15 @@ class Nav {
 val LocalNav = staticCompositionLocalOf { Nav() }
 
 class MainActivity : ComponentActivity() {
+    /** Retour géré en un seul appui : Compose ne doit pas l'utiliser pour retirer le focus. */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK || event.keyCode == android.view.KeyEvent.KEYCODE_ESCAPE) {
+            if (event.action == android.view.KeyEvent.ACTION_UP && !event.isCanceled) onBackPressedDispatcher.onBackPressed()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Connexion automatique pour les tests sur émulateur
