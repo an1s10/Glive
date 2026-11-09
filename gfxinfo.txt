@@ -1,0 +1,61 @@
+Applications Graphics Acceleration Info:
+Uptime: 274702 Realtime: 274702
+
+** Graphics info for pid 3178 [com.anis.glive] **
+
+Stats since: 38525338649ns
+Total frames rendered: 747
+Janky frames: 706 (94.51%)
+50th percentile: 48ms
+90th percentile: 85ms
+95th percentile: 101ms
+99th percentile: 150ms
+Number Missed Vsync: 316
+Number High input latency: 142
+Number Slow UI thread: 326
+Number Slow bitmap uploads: 35
+Number Slow issue draw commands: 563
+Number Frame deadline missed: 566
+HISTOGRAM: 5ms=1 6ms=0 7ms=1 8ms=3 9ms=2 10ms=1 11ms=2 12ms=2 13ms=3 14ms=10 15ms=9 16ms=7 17ms=3 18ms=4 19ms=4 20ms=7 21ms=10 22ms=9 23ms=11 24ms=6 25ms=6 26ms=9 27ms=7 28ms=10 29ms=8 30ms=2 31ms=8 32ms=20 34ms=23 36ms=20 38ms=28 40ms=20 42ms=36 44ms=20 46ms=16 48ms=46 53ms=71 57ms=54 61ms=40 65ms=37 69ms=23 73ms=29 77ms=27 81ms=10 85ms=16 89ms=12 93ms=4 97ms=9 101ms=9 105ms=5 109ms=3 113ms=1 117ms=2 121ms=4 125ms=2 129ms=2 133ms=1 150ms=7 200ms=2 250ms=1 300ms=0 350ms=0 400ms=0 450ms=1 500ms=1 550ms=0 600ms=0 650ms=0 700ms=0 750ms=0 800ms=0 850ms=0 900ms=0 950ms=0 1000ms=0 1050ms=0 1100ms=0 1150ms=0 1200ms=0 1250ms=0 1300ms=0 1350ms=0 1400ms=0 1450ms=0 1500ms=0 1550ms=0 1600ms=0 1650ms=0 1700ms=0 1750ms=0 1800ms=0 1850ms=0 1900ms=0 1950ms=0 2000ms=0 2050ms=0 2100ms=0 2150ms=0 2200ms=0 2250ms=0 2300ms=0 2350ms=0 2400ms=0 2450ms=0 2500ms=0 2550ms=0 2600ms=0 2650ms=0 2700ms=0 2750ms=0 2800ms=0 2850ms=0 2900ms=0 2950ms=0 3000ms=0 3050ms=0 3100ms=0 3150ms=0 3200ms=0 3250ms=0 3300ms=0 3350ms=0 3400ms=0 3450ms=0 3500ms=0 3550ms=0 3600ms=0 3650ms=0 3700ms=0 3750ms=0 3800ms=0 3850ms=0 3900ms=0 3950ms=0 4000ms=0 4050ms=0 4100ms=0 4150ms=0 4200ms=0 4250ms=0 4300ms=0 4350ms=0 4400ms=0 4450ms=0 4500ms=0 4550ms=0 4600ms=0 4650ms=0 4700ms=0 4750ms=0 4800ms=0 4850ms=0 4900ms=0 4950ms=0
+50th gpu percentile: 21ms
+90th gpu percentile: 4950ms
+95th gpu percentile: 4950ms
+99th gpu percentile: 4950ms
+GPU HISTOGRAM: 1ms=0 2ms=1 3ms=5 4ms=3 5ms=7 6ms=10 7ms=10 8ms=12 9ms=18 10ms=27 11ms=19 12ms=26 13ms=26 14ms=23 15ms=26 16ms=25 17ms=22 18ms=21 19ms=38 20ms=34 21ms=31 22ms=37 23ms=20 24ms=36 25ms=35 4950ms=232
+Font Cache (CPU):
+  Size: 197.27 kB 
+  Glyph Count: 53 
+CPU Caches:
+GPU Caches:
+  SW Path Mask:
+    Texture: 10.06 KB (8 entries)
+  Other:
+    Other: 38.43 KB (1 entry)
+    Buffer Object: 2.05 KB (2 entries)
+  Image:
+    Texture: 0.00 bytes (46 entries)
+  Scratch:
+    RenderTarget: 90.42 MB (197 entries)
+    Texture: 2.00 MB (1 entry)
+    Buffer Object: 206.00 KB (6 entries)
+Other Caches:
+                         Current / Maximum
+  Layers Total           0.00 KB (numLayers = 0)
+Total GPU memory usage:
+  97174032 bytes, 92.67 MB (84.39 MB is purgeable)
+
+
+Pipeline=Skia (OpenGL)
+Profile data in ms:
+
+	com.anis.glive/com.anis.glive.ui.MainActivity/android.view.ViewRootImpl@81d4e6f (visibility=0)
+View hierarchy:
+
+  com.anis.glive/com.anis.glive.ui.MainActivity/android.view.ViewRootImpl@81d4e6f
+  7 views, 8.19 kB of render nodes
+
+
+Total ViewRootImpl   : 1
+Total attached Views : 7
+Total RenderNode     : 8.19 kB (used) / 32.89 kB (capacity)
+
