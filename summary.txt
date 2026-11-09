@@ -1,0 +1,8 @@
+a_plain.json {"leagues":[{"id":"775","uid":"s:600~l:775","name":"UEFA Champions League","abbreviation":"UEFA Champions League","midsi
+b_dates.json {"code":400,"message":"Failed to get events endpoint."}
+c_limit.json {"code":400,"message":"Failed to get events endpoint."}
+d_lang.json {"code":400,"message":"Failed to get events endpoint."}
+e_liga.json {"code":400,"message":"Failed to get events endpoint."}
+f_real_fixture.json {"timestamp":"2026-11-09T04:25:09Z","status":"success","season":{"year":2026,"type":14357,"name":"2026-27 LALIGA","displ
+g_alg.json {"code":400,"message":"Failed to get events endpoint."}
+h_can.json {"leagues":[{"id":"3908","uid":"s:600~l:3908","name":"Africa Cup of Nations","abbreviation":"Africa Cup of Nations","mid
