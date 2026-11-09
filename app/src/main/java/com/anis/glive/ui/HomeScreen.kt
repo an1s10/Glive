@@ -201,7 +201,7 @@ fun HomeContent() {
     val team = app.prefs.favoriteTeam
     val heroMatch = remember(matches) {
         matches.firstOrNull { it.live && it.involves(team) }
-            ?: matches.firstOrNull { !it.finished && it.involves(team) && it.time - System.currentTimeMillis() < 3 * 86_400_000L }
+            ?: matches.firstOrNull { !it.finished && it.involves(team) && it.time - System.currentTimeMillis() < 14 * 86_400_000L }
             ?: matches.firstOrNull { it.live && it.league.code == "uefa.champions" }
     }
     val footRow = remember(matches) {

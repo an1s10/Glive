@@ -63,25 +63,36 @@ object Football {
             val ttl = if (l.any { it.live }) 60_000L else 10 * 60_000L
             if (!force && now - t < ttl) return l
         }
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -1)
-        val from = day.format(cal.time)
-        cal.add(Calendar.DAY_OF_YEAR, 9)
-        val to = day.format(cal.time)
         val list = withContext(Dispatchers.IO) {
             coroutineScope {
-                leagues.map { lg -> async { runCatching { fetchLeague(lg, "$from-$to") }.getOrDefault(emptyList()) } }.awaitAll().flatten()
+                val boards = leagues.map { lg -> async { runCatching { fetchLeague(lg) }.getOrDefault(emptyList()) } }
+                val team = async { runCatching { teamSchedule(86, "esp.1") }.getOrDefault(emptyList()) }
+                boards.awaitAll().flatten() + team.await()
             }
         }.distinctBy { it.id }.sortedWith(compareBy<Match>({ if (it.live) 0 else if (it.finished) 2 else 1 }, { it.time }))
         if (list.isNotEmpty()) cache = now to list
         return list.ifEmpty { cache?.second ?: emptyList() }
     }
 
-    private fun fetchLeague(lg: League, dates: String): List<Match> {
-        val url = "https://site.api.espn.com/apis/site/v2/sports/soccer/${lg.code}/scoreboard?dates=$dates&limit=200&lang=fr&region=fr"
+    private fun get(url: String): JsonObject? {
         val body = http.newCall(Request.Builder().url(url).build()).execute().use { it.body?.string() ?: "" }
-        val root = json.parseToJsonElement(body).obj() ?: return emptyList()
+        return json.parseToJsonElement(body).obj()
+    }
+
+    private fun fetchLeague(lg: League): List<Match> {
+        val root = get("https://site.api.espn.com/apis/site/v2/sports/soccer/${lg.code}/scoreboard") ?: return emptyList()
         return root["events"].arr().orEmpty().mapNotNull { it.obj() }.mapNotNull { ev -> parseEvent(ev, lg) }
+    }
+
+    /** Prochains matchs d'une équipe, toutes compétitions. */
+    private fun teamSchedule(teamId: Int, leagueCode: String): List<Match> {
+        val root = get("https://site.api.espn.com/apis/site/v2/sports/soccer/$leagueCode/teams/$teamId/schedule?fixture=true") ?: return emptyList()
+        return root["events"].arr().orEmpty().mapNotNull { it.obj() }.take(6).mapNotNull { ev ->
+            val slug = ev["league"].obj()?.str("slug") ?: leagueCode
+            val lg = leagues.firstOrNull { it.code == slug }
+                ?: League(slug, ev["league"].obj()?.str("shortName")?.ifEmpty { null } ?: "Football", listOf("bein", "dazn", "canal", "tsn", "espn"))
+            parseEvent(ev, lg)
+        }
     }
 
     private fun scoreOf(e: JsonElement?): String = when (e) {
@@ -95,13 +106,13 @@ object Football {
         val teams = comp["competitors"].arr().orEmpty().mapNotNull { it.obj() }
         val home = teams.firstOrNull { it.str("homeAway") == "home" } ?: teams.getOrNull(0) ?: return null
         val away = teams.firstOrNull { it.str("homeAway") == "away" } ?: teams.getOrNull(1) ?: return null
-        val status = ev["status"].obj() ?: comp["status"].obj()
+        val status = comp["status"].obj() ?: ev["status"].obj()
         val type = status?.get("type").obj()
         val state = type?.str("state") ?: "pre"
         val detail = if (state == "in") status?.str("displayClock")?.ifEmpty { null } ?: type?.str("shortDetail") ?: "" else type?.str("shortDetail") ?: ""
         val time = runCatching { iso.parse(ev.str("date").take(16))!!.time }.getOrDefault(0L)
         val broadcasts = comp["broadcasts"].arr().orEmpty().mapNotNull { it.obj() }
-            .flatMap { b -> b["names"].arr().orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull } } +
+            .flatMap { b -> b["names"].arr().orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull } + listOfNotNull(b["media"].obj()?.str("shortName")?.ifEmpty { null }) } +
             comp["geoBroadcasts"].arr().orEmpty().mapNotNull { it.obj()?.get("media").obj()?.str("shortName") }
         fun team(o: JsonObject) = o["team"].obj()
         return Match(
@@ -109,8 +120,8 @@ object Football {
             league = lg,
             home = team(home)?.str("shortDisplayName")?.ifEmpty { null } ?: team(home)?.str("displayName") ?: "",
             away = team(away)?.str("shortDisplayName")?.ifEmpty { null } ?: team(away)?.str("displayName") ?: "",
-            homeLogo = team(home)?.str("logo") ?: "",
-            awayLogo = team(away)?.str("logo") ?: "",
+            homeLogo = logoOf(team(home)),
+            awayLogo = logoOf(team(away)),
             homeScore = scoreOf(home["score"]),
             awayScore = scoreOf(away["score"]),
             state = state,
@@ -118,6 +129,12 @@ object Football {
             time = time,
             broadcasts = broadcasts.distinct(),
         )
+    }
+
+    private fun logoOf(t: JsonObject?): String {
+        if (t == null) return ""
+        t.str("logo").takeIf { it.isNotEmpty() }?.let { return it }
+        return t["logos"].arr()?.firstOrNull()?.obj()?.str("href") ?: ""
     }
 
     /** Chaînes de la playlist qui diffusent probablement ce match, classées par langue préférée. */
