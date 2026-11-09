@@ -48,6 +48,7 @@ fun FocusCard(
     color: Color = C.surface,
     focusedColor: Color = C.surface3,
     focusedScale: Float = 1.05f,
+    focusedContentColor: Color = C.text,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Surface(
@@ -59,7 +60,7 @@ fun FocusCard(
             containerColor = color,
             contentColor = C.text,
             focusedContainerColor = focusedColor,
-            focusedContentColor = C.text,
+            focusedContentColor = focusedContentColor,
             pressedContainerColor = focusedColor,
             pressedContentColor = C.text,
         ),

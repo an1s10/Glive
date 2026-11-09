@@ -188,7 +188,7 @@ fun LivePlayer(channels: List<Channel>, startIndex: Int) {
         play(index)
     }
     LaunchedEffect(infoTick, showInfo) {
-        if (showInfo) { delay(5000); showInfo = false }
+        if (showInfo) { delay(7000); showInfo = false }
     }
     LaunchedEffect(numberBuffer) {
         if (numberBuffer.isNotEmpty()) {
@@ -331,6 +331,7 @@ fun ChannelPanel(
                 ChannelLine(
                     c, c.id in favs,
                     modifier = if (i == current) Modifier.focusRequester(first) else Modifier,
+                    compact = true,
                     onFocus = { focused = i },
                     onLongClick = { GliveApp.instance.prefs.toggleFavorite(c.id) },
                 ) { onPick(i) }

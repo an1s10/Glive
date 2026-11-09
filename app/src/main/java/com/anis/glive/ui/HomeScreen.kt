@@ -79,6 +79,18 @@ fun HomeScreen(onLogout: () -> Unit) {
     var railFocused by remember { mutableStateOf(false) }
     val railWidth by animateDpAsState(if (railFocused) 190.dp else 64.dp, label = "rail")
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var lastBack by remember { mutableStateOf(0L) }
+    androidx.activity.compose.BackHandler {
+        if (section != Section.HOME) { section = Section.HOME; pending = null; return@BackHandler }
+        val now = System.currentTimeMillis()
+        if (now - lastBack < 2500) (context as? android.app.Activity)?.finish()
+        else {
+            lastBack = now
+            android.widget.Toast.makeText(context, "Appuie encore sur Retour pour quitter Glive", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Row(Modifier.fillMaxSize().background(C.bg)) {
         Column(
             Modifier
@@ -96,7 +108,7 @@ fun HomeScreen(onLogout: () -> Unit) {
                     onClick = { section = s },
                     modifier = Modifier.fillMaxWidth().height(42.dp).onFocusGained { pending = s },
                     color = if (selected) C.surface2 else Color.Transparent,
-                    focusedColor = C.text,
+                    focusedColor = C.accent,
                     focusedScale = 1f,
                 ) {
                     Row(
@@ -104,7 +116,7 @@ fun HomeScreen(onLogout: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        NavIcon(s.icon, if (selected) C.text else C.dim)
+                        NavIcon(s.icon, if (selected || railFocused) C.text else C.dim)
                         if (railFocused) Text(s.label, style = T.label, maxLines = 1)
                     }
                 }

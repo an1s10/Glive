@@ -23,6 +23,11 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
           ffmpeg -loglevel error -f lavfi -i testsrc2=size=1280x720:rate=25 -f lavfi -i sine=frequency=440 -t 120 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -f mpegts test.ts
           ffmpeg -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -f lavfi -i sine=frequency=660 -t 600 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -movflags +faststart test.mp4
+      - name: Données foot de test (ESPN)
+        run: |
+          mkdir -p shots
+          curl -s -m 20 -o shots/espn_ucl.json "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard?dates=$(date -d '-1 day' +%Y%m%d)-$(date -d '+8 day' +%Y%m%d)&limit=200&lang=fr&region=fr" || echo "echec" > shots/espn_ucl.json
+          curl -s -m 20 -o shots/espn_liga.json "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard?dates=$(date -d '-1 day' +%Y%m%d)-$(date -d '+8 day' +%Y%m%d)&limit=200&lang=fr&region=fr" || true
       - name: Faux serveur Xtream
         run: nohup python3 tools/mock_xtream.py http://10.0.2.2:8000 > mock.log 2>&1 &
       - name: Activer KVM

@@ -120,7 +120,15 @@ fun LiveSection() {
 }
 
 @Composable
-fun ChannelLine(ch: Channel, fav: Boolean, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+fun ChannelLine(
+    ch: Channel,
+    fav: Boolean,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    onFocus: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val progs = rememberNowNext(ch.id)
     val now = nowSec()
     val cur = progs.firstOrNull { it.isNow(now) }
@@ -132,30 +140,34 @@ fun ChannelLine(ch: Channel, fav: Boolean, modifier: Modifier = Modifier, onFocu
         focusedScale = 1.02f,
     ) {
         Row(
-            Modifier.fillMaxWidth().height(62.dp).padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().height(if (compact) 58.dp else 64.dp).padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(if (ch.num > 0) "${ch.num}" else "", style = T.small, modifier = Modifier.width(34.dp))
-            ChannelLogo(ch.logo, ch.name, size = 44.dp)
-            Column(Modifier.width(210.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(if (ch.num > 0) "${ch.num}" else "", style = T.small, maxLines = 1, modifier = Modifier.width(36.dp))
+            ChannelLogo(ch.logo, ch.name, size = if (compact) 40.dp else 44.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Flag(ch.lang, width = 15.dp)
                     Text(cleanName(ch.name), style = T.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (fav) Text("★", style = T.small, color = C.star)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (fav) Text("★ Favori", style = T.small, color = C.star)
-                    if (ch.archive) Text("Replay ${ch.archiveDays} j", style = T.small)
+                if (compact) {
+                    Text(cur?.title ?: "Pas de programme", style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else if (ch.archive) {
+                    Text("Replay ${ch.archiveDays} jours", style = T.small, maxLines = 1)
                 }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(cur?.title ?: "Pas de programme", style = T.label, color = if (cur != null) C.text else C.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (cur != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("${fmtTime(cur.start)}", style = T.small)
-                        Bar(cur.progress(now), Modifier.width(120.dp))
-                        Text("${fmtTime(cur.end)}", style = T.small)
-                        if (next != null) Text("· ${next.title}", style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!compact) {
+                Column(Modifier.weight(1.4f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(cur?.title ?: "Pas de programme", style = T.label, color = if (cur != null) C.text else C.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (cur != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(fmtTime(cur.start), style = T.small, maxLines = 1)
+                            Bar(cur.progress(now), Modifier.weight(1f))
+                            Text(fmtTime(cur.end), style = T.small, maxLines = 1)
+                        }
+                        if (next != null) Text("Ensuite : ${next.title}", style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
