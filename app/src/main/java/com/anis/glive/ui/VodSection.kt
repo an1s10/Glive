@@ -31,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
@@ -76,7 +75,7 @@ fun MoviesSection() {
     Column(Modifier.fillMaxSize()) {
         VodHeader(focused, "Films")
         LazyColumn(contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            items(cats, key = { it.id }) { cat ->
+            items(cats) { cat ->
                 val list = catalog.moviesByCat[cat.id].orEmpty()
                 Column {
                     Row(Modifier.padding(start = 40.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -85,7 +84,7 @@ fun MoviesSection() {
                         Text("${list.size}", style = T.small)
                     }
                     LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        items(list, key = { it.id }) { m ->
+                        items(list) { m ->
                             Poster(m.poster, m.name, m.rating, onFocus = { focused = Focused(m.name, m.rating, m.poster, "") }) {
                                 nav.push(Route.MovieDetail(m))
                             }
@@ -110,7 +109,7 @@ fun SeriesSection() {
     Column(Modifier.fillMaxSize()) {
         VodHeader(focused, "Séries")
         LazyColumn(contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            items(cats, key = { it.id }) { cat ->
+            items(cats) { cat ->
                 val list = catalog.seriesByCat[cat.id].orEmpty()
                 Column {
                     Row(Modifier.padding(start = 40.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -119,7 +118,7 @@ fun SeriesSection() {
                         Text("${list.size}", style = T.small)
                     }
                     LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        items(list, key = { it.id }) { s ->
+                        items(list) { s ->
                             Poster(s.poster, s.name, s.rating, onFocus = { focused = Focused(s.name, s.rating, s.poster, listOf(s.year, s.plot).filter { it.isNotBlank() }.joinToString(" · ")) }) {
                                 nav.push(Route.SeriesDetail(s))
                             }
@@ -271,7 +270,7 @@ fun SeriesDetailScreen(series: Series) {
             }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    items(eps.size, key = { eps[it].id }) { i ->
+                    items(eps.size) { i ->
                         val e = eps[i]
                         val r = resumes.firstOrNull { it.key == "ep:${series.id}:${e.id}" }
                         FocusCard(onClick = { playEp(eps, i) }, modifier = Modifier.width(230.dp)) {

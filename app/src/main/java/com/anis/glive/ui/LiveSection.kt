@@ -60,15 +60,17 @@ fun channelsOf(group: String, catalog: Catalog, favs: Set<Int>): List<Channel> =
 
 @Composable
 fun GroupColumn(groups: List<Group>, selected: String, onSelect: (String) -> Unit) {
+    var pending by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(pending) { pending?.let { kotlinx.coroutines.delay(260); onSelect(it) } }
     LazyColumn(
         Modifier.width(210.dp).fillMaxHeight().background(C.bg),
         contentPadding = PaddingValues(vertical = 24.dp, horizontal = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        items(groups, key = { it.id }) { g ->
+        items(groups) { g ->
             FocusCard(
                 onClick = { onSelect(g.id) },
-                modifier = Modifier.fillMaxWidth().onFocusGained { onSelect(g.id) },
+                modifier = Modifier.fillMaxWidth().onFocusGained { pending = g.id },
                 color = if (g.id == selected) C.surface2 else C.bg,
                 focusedScale = 1.02f,
             ) {
@@ -106,7 +108,7 @@ fun LiveSection() {
                 contentPadding = PaddingValues(vertical = 24.dp, horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(channels.size, key = { channels[it].id }) { i ->
+                items(channels.size) { i ->
                     ChannelLine(channels[i], favs.contains(channels[i].id),
                         onLongClick = { app.prefs.toggleFavorite(channels[i].id) }) {
                         nav.push(Route.Live(channels, i))
@@ -119,7 +121,7 @@ fun LiveSection() {
 
 @Composable
 fun ChannelLine(ch: Channel, fav: Boolean, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
-    val progs = rememberPrograms(ch.id)
+    val progs = rememberNowNext(ch.id)
     val now = nowSec()
     val cur = progs.firstOrNull { it.isNow(now) }
     val next = progs.firstOrNull { it.start >= (cur?.end ?: now) }
@@ -180,7 +182,7 @@ fun GuideSection() {
             contentPadding = PaddingValues(vertical = 24.dp, horizontal = 10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            items(channels.size, key = { channels[it].id }) { i ->
+            items(channels.size) { i ->
                 val c = channels[i]
                 FocusCard(
                     onClick = { nav.push(Route.Live(channels, i)) },
@@ -218,7 +220,7 @@ fun ProgramList(ch: Channel, channels: List<Channel>) {
         }
         val state = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = startIndex)
         LazyColumn(state = state, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-            items(progs, key = { it.start }) { p ->
+            items(progs) { p ->
                 val live = p.isNow(now)
                 val replay = p.isPast(now) && (p.hasArchive || ch.archive)
                 FocusCard(

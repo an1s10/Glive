@@ -250,3 +250,33 @@ fun fmtDuration(ms: Long): String {
 
 fun Modifier.onFocusGained(f: () -> Unit): Modifier =
     this.then(Modifier.onFocusChanged { if (it.isFocused) f() })
+
+/** Bouton maison : blanc s'il est principal (colors fourni), sinon translucide. Grossit au focus. */
+@Composable
+fun Button(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    colors: Any? = null,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    val primary = colors != null
+    FocusCard(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = if (primary) C.text else C.surface2,
+        focusedColor = if (primary) C.text else C.accent,
+        focusedScale = 1.06f,
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.tv.material3.LocalContentColor provides if (primary) Color(0xFF0A0C10) else C.text
+        ) {
+            Row(
+                Modifier.padding(horizontal = 20.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                content = content,
+            )
+        }
+    }
+}

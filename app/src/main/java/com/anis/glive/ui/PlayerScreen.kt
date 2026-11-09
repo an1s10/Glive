@@ -268,7 +268,7 @@ fun LivePlayer(channels: List<Channel>, startIndex: Int) {
 @Composable
 fun LiveInfoBar(ch: Channel, index: Int, total: Int) {
     val favs by GliveApp.instance.prefs.favorites.collectAsState()
-    val progs = rememberPrograms(ch.id)
+    val progs = rememberNowNext(ch.id)
     val now = nowSec()
     val cur = progs.firstOrNull { it.isNow(now) }
     val next = progs.firstOrNull { it.start >= (cur?.end ?: now) }
@@ -326,7 +326,7 @@ fun ChannelPanel(
             contentPadding = PaddingValues(vertical = 24.dp, horizontal = 14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            items(channels.size, key = { channels[it].id }) { i ->
+            items(channels.size) { i ->
                 val c = channels[i]
                 ChannelLine(
                     c, c.id in favs,

@@ -33,7 +33,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import com.anis.glive.BuildConfig
 import com.anis.glive.GliveApp
@@ -54,9 +53,18 @@ fun SearchSection() {
     var debounced by remember { mutableStateOf("") }
     LaunchedEffect(query) { delay(300); debounced = query }
     val q = normalize(debounced.trim())
-    val channels = remember(q, catalog) { if (q.length < 2) emptyList() else catalog.channels.filter { normalize(it.name).contains(q) }.take(60) }
-    val movies = remember(q, catalog) { if (q.length < 2) emptyList() else catalog.movies.filter { normalize(it.name).contains(q) }.take(60) }
-    val series = remember(q, catalog) { if (q.length < 2) emptyList() else catalog.series.filter { normalize(it.name).contains(q) }.take(60) }
+    var channels by remember { mutableStateOf(emptyList<com.anis.glive.data.Channel>()) }
+    var movies by remember { mutableStateOf(emptyList<com.anis.glive.data.Movie>()) }
+    var series by remember { mutableStateOf(emptyList<com.anis.glive.data.Series>()) }
+    LaunchedEffect(q, catalog) {
+        if (q.length < 2) { channels = emptyList(); movies = emptyList(); series = emptyList(); return@LaunchedEffect }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val c = catalog.channels.filter { normalize(it.name).contains(q) }.take(60)
+            val m = catalog.movies.filter { normalize(it.name).contains(q) }.take(60)
+            val s = catalog.series.filter { normalize(it.name).contains(q) }.take(60)
+            channels = c; movies = m; series = s
+        }
+    }
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
@@ -91,13 +99,13 @@ fun SearchSection() {
         if (movies.isNotEmpty()) item {
             RowTitle("Films (${movies.size})")
             LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(movies, key = { it.id }) { m -> Poster(m.poster, m.name, m.rating) { nav.push(Route.MovieDetail(m)) } }
+                items(movies) { m -> Poster(m.poster, m.name, m.rating) { nav.push(Route.MovieDetail(m)) } }
             }
         }
         if (series.isNotEmpty()) item {
             RowTitle("Séries (${series.size})")
             LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(series, key = { it.id }) { s -> Poster(s.poster, s.name, s.rating) { nav.push(Route.SeriesDetail(s)) } }
+                items(series) { s -> Poster(s.poster, s.name, s.rating) { nav.push(Route.SeriesDetail(s)) } }
             }
         }
         if (q.length >= 2 && channels.isEmpty() && movies.isEmpty() && series.isEmpty()) item {
@@ -128,6 +136,29 @@ fun SettingsSection(onLogout: () -> Unit) {
 
     LazyColumn(contentPadding = PaddingValues(40.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text("Réglages", style = T.h1) }
+        item {
+            Text("Thème", style = T.h2)
+            Gap(8)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(Themes.all) { p ->
+                    val sel = Themes.current.id == p.id
+                    FocusCard(
+                        onClick = { Themes.select(p.id); app.prefs.theme = p.id },
+                        color = p.surface, focusedColor = p.surface3,
+                        modifier = Modifier.width(150.dp),
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                androidx.compose.foundation.layout.Box(Modifier.width(22.dp).height(22.dp).background(p.bg, RoundedCornerShape(50)))
+                                androidx.compose.foundation.layout.Box(Modifier.width(22.dp).height(22.dp).background(p.accent, RoundedCornerShape(50)))
+                            }
+                            Text(p.name + if (sel) "  ✓" else "", style = T.label)
+                        }
+                    }
+                }
+            }
+            Gap(10)
+        }
         item {
             Text("Langues affichées", style = T.h2)
             Text("Rien de coché = toutes les langues. Le reste est caché partout dans l'app.", style = T.small)
@@ -160,7 +191,7 @@ fun SettingsSection(onLogout: () -> Unit) {
                 Pill("Séries", kind == "series") { kind = "series" }
             }
         }
-        items(cats, key = { "$kind:${it.id}" }) { c ->
+        items(cats) { c ->
             val key = "$kind:${c.id}"
             val isHidden = key in hidden
             FocusCard(onClick = { app.prefs.toggleHidden(key) }, modifier = Modifier.width(560.dp), focusedScale = 1.02f) {

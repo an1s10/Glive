@@ -24,6 +24,10 @@ class Prefs(context: Context) {
         get() = sp.getString("ua", DEFAULT_UA) ?: DEFAULT_UA
         set(v) = sp.edit().putString("ua", v).apply()
 
+    var theme: String
+        get() = sp.getString("theme", "bleu") ?: "bleu"
+        set(v) = sp.edit().putString("theme", v).apply()
+
     var lastChannel: Int
         get() = sp.getInt("lastChannel", -1)
         set(v) = sp.edit().putInt("lastChannel", v).apply()

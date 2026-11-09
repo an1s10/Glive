@@ -12,7 +12,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import android.util.JsonReader
+import android.util.JsonToken
+import java.io.File
 import java.io.IOException
+import java.io.InputStreamReader
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
@@ -96,63 +100,129 @@ class Xtream(val account: Account, userAgent: String) {
         return "${account.base}/timeshift/${account.user}/${account.pass}/$durationMin/$date:$hm/$id.ts"
     }
 
-    // ---- Parsing ----
-    fun parseCategories(body: String): List<Category> =
-        json.parseToJsonElement(body).arr().orEmpty().mapNotNull { it.obj() }.map {
-            val name = it.str("category_name")
-            Category(it.str("category_id"), name, Lang.detect(name))
+    /** Télécharge directement dans un fichier, sans tout charger en mémoire. */
+    suspend fun download(url: String, dest: File) = withContext(Dispatchers.IO) {
+        val tmp = File(dest.parentFile, dest.name + ".tmp")
+        http.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+            resp.body!!.byteStream().use { input -> tmp.outputStream().use { input.copyTo(it, 64 * 1024) } }
         }
+        if (!tmp.renameTo(dest)) { tmp.copyTo(dest, overwrite = true); tmp.delete() }
+    }
 
-    fun parseChannels(body: String, cats: Map<String, Category>): List<Channel> =
-        json.parseToJsonElement(body).arr().orEmpty().mapNotNull { it.obj() }.map {
-            val cat = it.str("category_id")
-            val name = it.str("name")
-            val lang = cats[cat]?.lang?.takeIf { l -> l != Lang.OTHER } ?: Lang.detect(name)
-            Channel(
-                id = it.int("stream_id"),
-                num = it.int("num"),
-                name = name.trim(),
-                logo = it.str("stream_icon"),
-                categoryId = cat,
-                epgId = it.str("epg_channel_id"),
-                archive = it.int("tv_archive") == 1,
-                archiveDays = it.int("tv_archive_duration"),
-                lang = lang,
-            )
+    /** Lit un tableau JSON d'objets en flux, en ne gardant que les champs demandés. */
+    private fun readObjects(file: File, keys: Set<String>, each: (Map<String, String>) -> Unit) {
+        if (!file.exists()) return
+        JsonReader(InputStreamReader(file.inputStream().buffered(64 * 1024), Charsets.UTF_8)).use { r ->
+            r.isLenient = true
+            if (r.peek() != JsonToken.BEGIN_ARRAY) return
+            r.beginArray()
+            while (r.hasNext()) {
+                if (r.peek() != JsonToken.BEGIN_OBJECT) { r.skipValue(); continue }
+                val m = HashMap<String, String>(keys.size * 2)
+                r.beginObject()
+                while (r.hasNext()) {
+                    val name = r.nextName()
+                    if (name in keys) {
+                        when (r.peek()) {
+                            JsonToken.STRING, JsonToken.NUMBER -> m[name] = r.nextString()
+                            JsonToken.BOOLEAN -> m[name] = r.nextBoolean().toString()
+                            JsonToken.NULL -> { r.nextNull() }
+                            else -> r.skipValue()
+                        }
+                    } else r.skipValue()
+                }
+                r.endObject()
+                runCatching { each(m) }
+            }
+            r.endArray()
         }
+    }
 
-    fun parseMovies(body: String, cats: Map<String, Category>): List<Movie> =
-        json.parseToJsonElement(body).arr().orEmpty().mapNotNull { it.obj() }.map {
-            val cat = it.str("category_id")
-            val name = it.str("name")
-            Movie(
-                id = it.int("stream_id"),
-                name = name.trim(),
-                poster = it.str("stream_icon"),
-                categoryId = cat,
-                rating = it.dbl("rating").takeIf { r -> r > 0 } ?: (it.dbl("rating_5based") * 2),
-                added = it.long("added"),
-                ext = it.str("container_extension"),
+    private fun Map<String, String>.s(k: String) = this[k] ?: ""
+    private fun Map<String, String>.i(k: String) = this[k]?.toDoubleOrNull()?.toInt() ?: 0
+    private fun Map<String, String>.l(k: String) = this[k]?.toDoubleOrNull()?.toLong() ?: 0L
+    private fun Map<String, String>.d(k: String) = this[k]?.replace(',', '.')?.toDoubleOrNull() ?: 0.0
+
+    fun parseCategories(file: File): List<Category> {
+        val out = ArrayList<Category>()
+        val seen = HashSet<String>()
+        readObjects(file, setOf("category_id", "category_name")) {
+            val id = it.s("category_id")
+            if (seen.add(id)) out.add(Category(id, it.s("category_name"), Lang.detect(it.s("category_name"))))
+        }
+        return out
+    }
+
+    fun parseChannels(file: File, cats: Map<String, Category>): List<Channel> {
+        val out = ArrayList<Channel>()
+        val seen = HashSet<Int>()
+        readObjects(file, setOf("stream_id", "num", "name", "stream_icon", "category_id", "epg_channel_id", "tv_archive", "tv_archive_duration")) {
+            val id = it.i("stream_id")
+            if (id == 0 || !seen.add(id)) return@readObjects
+            val cat = it.s("category_id")
+            val name = it.s("name").trim()
+            out.add(Channel(
+                id = id, num = it.i("num"), name = name, logo = it.s("stream_icon"), categoryId = cat,
+                epgId = it.s("epg_channel_id"), archive = it.i("tv_archive") == 1, archiveDays = it.i("tv_archive_duration"),
                 lang = cats[cat]?.lang?.takeIf { l -> l != Lang.OTHER } ?: Lang.detect(name),
-            )
+            ))
         }
+        return out
+    }
 
-    fun parseSeries(body: String, cats: Map<String, Category>): List<Series> =
-        json.parseToJsonElement(body).arr().orEmpty().mapNotNull { it.obj() }.map {
-            val cat = it.str("category_id")
-            val name = it.str("name")
-            Series(
-                id = it.int("series_id"),
-                name = name.trim(),
-                poster = it.str("cover"),
-                categoryId = cat,
-                rating = it.dbl("rating").takeIf { r -> r > 0 } ?: (it.dbl("rating_5based") * 2),
-                added = it.long("last_modified"),
-                plot = it.str("plot"),
-                year = it.str("releaseDate").take(4).ifEmpty { it.str("year") },
+    fun parseMovies(file: File, cats: Map<String, Category>): List<Movie> {
+        val out = ArrayList<Movie>()
+        val seen = HashSet<Int>()
+        readObjects(file, setOf("stream_id", "name", "stream_icon", "category_id", "rating", "rating_5based", "added", "container_extension")) {
+            val id = it.i("stream_id")
+            if (id == 0 || !seen.add(id)) return@readObjects
+            val cat = it.s("category_id")
+            val name = it.s("name").trim()
+            out.add(Movie(
+                id = id, name = name, poster = it.s("stream_icon"), categoryId = cat,
+                rating = it.d("rating").takeIf { r -> r > 0 } ?: (it.d("rating_5based") * 2),
+                added = it.l("added"), ext = it.s("container_extension"),
                 lang = cats[cat]?.lang?.takeIf { l -> l != Lang.OTHER } ?: Lang.detect(name),
-            )
+            ))
         }
+        return out
+    }
+
+    fun parseSeries(file: File, cats: Map<String, Category>): List<Series> {
+        val out = ArrayList<Series>()
+        val seen = HashSet<Int>()
+        readObjects(file, setOf("series_id", "name", "cover", "category_id", "rating", "rating_5based", "last_modified", "plot", "releaseDate", "year")) {
+            val id = it.i("series_id")
+            if (id == 0 || !seen.add(id)) return@readObjects
+            val cat = it.s("category_id")
+            val name = it.s("name").trim()
+            out.add(Series(
+                id = id, name = name, poster = it.s("cover"), categoryId = cat,
+                rating = it.d("rating").takeIf { r -> r > 0 } ?: (it.d("rating_5based") * 2),
+                added = it.l("last_modified"), plot = it.s("plot"),
+                year = it.s("releaseDate").take(4).ifEmpty { it.s("year") },
+                lang = cats[cat]?.lang?.takeIf { l -> l != Lang.OTHER } ?: Lang.detect(name),
+            ))
+        }
+        return out
+    }
+
+    /** Programme en cours et suivants (léger), pour les listes. */
+    suspend fun shortEpg(streamId: Int): List<Program> {
+        val body = fetch(apiUrl("get_short_epg", "&stream_id=$streamId&limit=4"))
+        val root = json.parseToJsonElement(body).obj() ?: return emptyList()
+        return root["epg_listings"].arr().orEmpty().mapNotNull { it.obj() }.map {
+            Program(
+                title = b64(it.str("title")),
+                description = b64(it.str("description")),
+                start = it.long("start_timestamp"),
+                end = it.long("stop_timestamp"),
+                hasArchive = it.int("has_archive") == 1,
+                startRaw = it.str("start"),
+            )
+        }.filter { it.end > it.start }.sortedBy { it.start }.distinctBy { it.start }
+    }
 
     suspend fun programs(streamId: Int): List<Program> {
         val body = fetch(apiUrl("get_simple_data_table", "&stream_id=$streamId"))
@@ -166,7 +236,7 @@ class Xtream(val account: Account, userAgent: String) {
                 hasArchive = it.int("has_archive") == 1,
                 startRaw = it.str("start"),
             )
-        }.filter { it.end > it.start }.sortedBy { it.start }
+        }.filter { it.end > it.start }.sortedBy { it.start }.distinctBy { it.start }
     }
 
     suspend fun movieInfo(id: Int): MovieInfo? {

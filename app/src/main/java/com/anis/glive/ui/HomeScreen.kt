@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
@@ -74,6 +73,8 @@ fun NavIcon(path: String, color: Color, modifier: Modifier = Modifier) {
 @Composable
 fun HomeScreen(onLogout: () -> Unit) {
     var section by rememberSaveable { mutableStateOf(Section.HOME) }
+    var pending by remember { mutableStateOf<Section?>(null) }
+    LaunchedEffect(pending) { pending?.let { delay(320); section = it } }
     var railFocused by remember { mutableStateOf(false) }
     val railWidth by animateDpAsState(if (railFocused) 190.dp else 64.dp, label = "rail")
 
@@ -92,7 +93,7 @@ fun HomeScreen(onLogout: () -> Unit) {
                 val selected = s == section
                 FocusCard(
                     onClick = { section = s },
-                    modifier = Modifier.fillMaxWidth().height(42.dp).onFocusGained { section = s },
+                    modifier = Modifier.fillMaxWidth().height(42.dp).onFocusGained { pending = s },
                     color = if (selected) C.surface2 else Color.Transparent,
                     focusedColor = C.text,
                     focusedScale = 1f,
@@ -108,8 +109,13 @@ fun HomeScreen(onLogout: () -> Unit) {
                 }
             }
         }
-        Box(Modifier.fillMaxSize()) {
-            when (section) {
+        androidx.compose.animation.Crossfade(
+            targetState = section,
+            animationSpec = androidx.compose.animation.core.tween(260),
+            modifier = Modifier.fillMaxSize(),
+            label = "section",
+        ) { current ->
+            when (current) {
                 Section.HOME -> HomeContent()
                 Section.LIVE -> LiveSection()
                 Section.GUIDE -> GuideSection()
@@ -122,7 +128,7 @@ fun HomeScreen(onLogout: () -> Unit) {
     }
 }
 
-/** Charge le programme d'une chaîne et rafraîchit chaque minute. */
+/** Programme complet d'une chaîne (guide). */
 @Composable
 fun rememberPrograms(channelId: Int): List<Program> {
     val repo = GliveApp.instance.repo
@@ -130,7 +136,24 @@ fun rememberPrograms(channelId: Int): List<Program> {
     LaunchedEffect(channelId) {
         while (true) {
             list = repo.programs(channelId)
-            delay(60_000)
+            delay(5 * 60_000)
+        }
+    }
+    return list
+}
+
+/** Programme en cours et suivant, léger : une seule requête, relancée à la fin de l'émission. */
+@Composable
+fun rememberNowNext(channelId: Int): List<Program> {
+    val repo = GliveApp.instance.repo
+    var list by remember(channelId) { mutableStateOf(repo.cachedNowNext(channelId) ?: emptyList()) }
+    LaunchedEffect(channelId) {
+        delay(150) // ne charge pas les chaînes qu'on fait juste défiler
+        while (true) {
+            list = repo.nowNext(channelId)
+            val end = list.firstOrNull { it.isNow(System.currentTimeMillis() / 1000) }?.end
+            val wait = if (end != null) (end * 1000 - System.currentTimeMillis()).coerceIn(30_000, 30 * 60_000) else 10 * 60_000L
+            delay(wait)
         }
     }
     return list
@@ -176,7 +199,7 @@ fun HomeContent() {
         if (catalog.recentMovies.isNotEmpty()) item {
             RowTitle("Films ajoutés récemment")
             LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(catalog.recentMovies, key = { it.id }) { m ->
+                items(catalog.recentMovies) { m ->
                     Poster(m.poster, m.name, m.rating) { nav.push(Route.MovieDetail(m)) }
                 }
             }
@@ -184,7 +207,7 @@ fun HomeContent() {
         if (catalog.recentSeries.isNotEmpty()) item {
             RowTitle("Séries mises à jour")
             LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(catalog.recentSeries, key = { it.id }) { s ->
+                items(catalog.recentSeries) { s ->
                     Poster(s.poster, s.name, s.rating) { nav.push(Route.SeriesDetail(s)) }
                 }
             }
@@ -207,7 +230,7 @@ fun RowTitle(text: String) {
 @Composable
 fun HeroChannel(ch: Channel, list: List<Channel>) {
     val nav = LocalNav.current
-    val progs = rememberPrograms(ch.id)
+    val progs = rememberNowNext(ch.id)
     val now = nowSec()
     val cur = progs.firstOrNull { it.isNow(now) }
     val next = progs.firstOrNull { it.start >= (cur?.end ?: now) }
@@ -259,7 +282,7 @@ fun ChannelRow(title: String, list: List<Channel>, onFocus: (Channel) -> Unit = 
     Column {
         RowTitle(title)
         LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(list.size, key = { list[it].id }) { i ->
+            items(list.size) { i ->
                 ChannelCard(list[i], onFocus = { onFocus(list[i]) }, onLongClick = { prefs.toggleFavorite(list[i].id) }) { onClick(i) }
             }
         }
@@ -268,7 +291,7 @@ fun ChannelRow(title: String, list: List<Channel>, onFocus: (Channel) -> Unit = 
 
 @Composable
 fun ChannelCard(ch: Channel, onFocus: () -> Unit = {}, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
-    val progs = rememberPrograms(ch.id)
+    val progs = rememberNowNext(ch.id)
     val now = nowSec()
     val cur = progs.firstOrNull { it.isNow(now) }
     FocusCard(
@@ -297,7 +320,7 @@ fun ResumeRow(resumes: List<com.anis.glive.data.Prefs.Resume>) {
     Column {
         RowTitle("Continuer à regarder")
         LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(resumes, key = { it.key }) { r ->
+            items(resumes) { r ->
                 FocusCard(
                     onClick = {
                         // clé "movie:<id>" ou "ep:<seriesId>:<episodeId>"

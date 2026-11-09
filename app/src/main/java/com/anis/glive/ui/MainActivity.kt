@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import com.anis.glive.GliveApp
 import com.anis.glive.data.Channel
@@ -76,8 +75,13 @@ fun App() {
     val repo = app.repo
     var loggedIn by remember { mutableStateOf(app.prefs.account != null) }
     val nav = remember { Nav() }
+    var crash by remember { mutableStateOf(app.crashFile().takeIf { it.exists() }?.readText()) }
 
     Box(Modifier.fillMaxSize().background(C.bg)) {
+        crash?.let { text ->
+            CrashScreen(text) { app.crashFile().delete(); crash = null }
+            return@Box
+        }
         if (!loggedIn) {
             LoginScreen(onDone = {
                 loggedIn = true
@@ -135,5 +139,17 @@ fun ErrorScreen(message: String, onRetry: () -> Unit, onLogout: () -> Unit) {
             Button(onClick = onRetry, modifier = Modifier.focusRequester(fr)) { Text("Réessayer") }
             Button(onClick = onLogout) { Text("Changer de compte") }
         }
+    }
+}
+
+@Composable
+fun CrashScreen(text: String, onContinue: () -> Unit) {
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    Column(Modifier.fillMaxSize().padding(36.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Glive a planté la dernière fois", style = T.h1)
+        Text("Prends cet écran en photo et envoie-la à Claude, puis appuie sur OK.", style = T.body)
+        Button(onClick = onContinue, modifier = Modifier.focusRequester(fr), colors = true) { Text("OK, continuer") }
+        Text(text.take(2500), style = T.small.copy(fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp)), color = C.text2)
     }
 }
