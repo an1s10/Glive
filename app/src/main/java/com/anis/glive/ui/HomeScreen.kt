@@ -73,7 +73,8 @@ fun NavIcon(path: String, color: Color, modifier: Modifier = Modifier) {
 
 @Composable
 fun HomeScreen(onLogout: () -> Unit) {
-    var section by rememberSaveable { mutableStateOf(Section.HOME) }
+    val nav = LocalNav.current
+    var section by nav::section
     var pending by remember { mutableStateOf<Section?>(null) }
     LaunchedEffect(pending) { pending?.let { delay(320); section = it } }
     var railFocused by remember { mutableStateOf(false) }

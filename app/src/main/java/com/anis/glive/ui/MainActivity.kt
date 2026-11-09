@@ -56,6 +56,8 @@ sealed class Route {
 
 class Nav {
     val stack = mutableStateListOf<Route>(Route.Home)
+    /** Rubrique de l'accueil, gardée quand on revient du lecteur. */
+    var section by mutableStateOf(Section.HOME)
     fun push(r: Route) { stack.add(r) }
     fun replace(r: Route) { if (stack.size > 1) stack.removeAt(stack.lastIndex); stack.add(r) }
     fun pop() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
