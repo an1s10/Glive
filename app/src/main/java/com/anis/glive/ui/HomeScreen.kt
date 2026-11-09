@@ -54,6 +54,7 @@ enum class Section(val label: String, val icon: String) {
     HOME("Accueil", "M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"),
     LIVE("Direct", "M4 7h16v12H4zM9 3l3 4 3-4"),
     GUIDE("Guide TV", "M3 5h18M3 12h18M3 19h18M8 5v14"),
+    FOOT("Matchs", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7l4 3-1.5 4.5h-5L8 10z"),
     MOVIES("Films", "M4 4h16v16H4zM4 9h16M4 15h16M9 4v16M15 4v16"),
     SERIES("Séries", "M3 6h18v12H3zM8 21h8M12 18v3"),
     SEARCH("Recherche", "M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zM20 20l-4-4"),
@@ -119,6 +120,7 @@ fun HomeScreen(onLogout: () -> Unit) {
                 Section.HOME -> HomeContent()
                 Section.LIVE -> LiveSection()
                 Section.GUIDE -> GuideSection()
+                Section.FOOT -> FootballSection()
                 Section.MOVIES -> MoviesSection()
                 Section.SERIES -> SeriesSection()
                 Section.SEARCH -> SearchSection()
@@ -183,12 +185,28 @@ fun HomeContent() {
     var hero by remember { mutableStateOf<Channel?>(null) }
     val heroCh = hero ?: recents.firstOrNull() ?: favs.firstOrNull() ?: catalog.channels.firstOrNull()
 
+    val matches = rememberMatches()
+    val team = app.prefs.favoriteTeam
+    val heroMatch = remember(matches) {
+        matches.firstOrNull { it.live && it.involves(team) }
+            ?: matches.firstOrNull { !it.finished && it.involves(team) && it.time - System.currentTimeMillis() < 3 * 86_400_000L }
+            ?: matches.firstOrNull { it.live && it.league.code == "uefa.champions" }
+    }
+    val footRow = remember(matches) {
+        (matches.filter { it.live } + matches.filter { !it.finished && !it.live && (it.involves(team) || it.league.code == "uefa.champions") })
+            .distinctBy { it.id }.take(15)
+    }
+
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
-        item { if (heroCh != null) HeroChannel(heroCh, favs.ifEmpty { recents }.ifEmpty { listOf(heroCh) }) }
+        item {
+            if (heroMatch != null) MatchHero(heroMatch)
+            else if (heroCh != null) HeroChannel(heroCh, favs.ifEmpty { recents }.ifEmpty { listOf(heroCh) })
+        }
+        if (footRow.isNotEmpty()) item { MatchRow("Football", footRow) }
         if (favs.isNotEmpty()) item {
             ChannelRow("Mes favoris", favs, onFocus = { hero = it }) { i -> nav.push(Route.Live(favs, i)) }
         }

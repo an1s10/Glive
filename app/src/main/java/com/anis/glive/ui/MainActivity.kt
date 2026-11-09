@@ -51,6 +51,7 @@ sealed class Route {
     ) : Route()
     data class MovieDetail(val movie: Movie) : Route()
     data class SeriesDetail(val series: Series) : Route()
+    data class MatchSources(val match: com.anis.glive.data.Match) : Route()
 }
 
 class Nav {
@@ -112,6 +113,7 @@ fun App() {
                     is Route.Vod -> PlayerScreen(PlayerMode.Vod(r))
                     is Route.MovieDetail -> MovieDetailScreen(r.movie)
                     is Route.SeriesDetail -> SeriesDetailScreen(r.series)
+                    is Route.MatchSources -> MatchSourcesScreen(r.match)
                 }
             }
         }

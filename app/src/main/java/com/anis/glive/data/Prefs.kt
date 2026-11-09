@@ -28,6 +28,10 @@ class Prefs(context: Context) {
         get() = sp.getString("theme", "bleu") ?: "bleu"
         set(v) = sp.edit().putString("theme", v).apply()
 
+    var favoriteTeam: String
+        get() = sp.getString("team", "Real Madrid") ?: "Real Madrid"
+        set(v) = sp.edit().putString("team", v).apply()
+
     var lastChannel: Int
         get() = sp.getInt("lastChannel", -1)
         set(v) = sp.edit().putInt("lastChannel", v).apply()
