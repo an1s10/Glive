@@ -65,6 +65,12 @@ val LocalNav = staticCompositionLocalOf { Nav() }
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Connexion automatique pour les tests sur émulateur
+        intent?.getStringExtra("server")?.let { server ->
+            val app = GliveApp.instance
+            app.prefs.account = com.anis.glive.data.Account(server, intent.getStringExtra("user") ?: "", intent.getStringExtra("pass") ?: "")
+            app.repo.start()
+        }
         setContent { GliveTheme { App() } }
     }
 }
