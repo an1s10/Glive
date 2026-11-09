@@ -12,7 +12,7 @@
         android:name=".GliveApp"
         android:allowBackup="true"
         android:banner="@drawable/banner"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:label="Glive"
         android:supportsRtl="true"
         android:theme="@style/Theme.Glive"
