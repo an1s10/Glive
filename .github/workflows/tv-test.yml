@@ -6,6 +6,9 @@ on:
     types: [completed]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   tv:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
@@ -38,8 +41,13 @@ jobs:
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash tools/tv_test.sh
-      - uses: actions/upload-artifact@v4
+      - name: Publier les captures sur la branche tv-shots
         if: always()
-        with:
-          name: tv-shots
-          path: shots/
+        run: |
+          mkdir -p /tmp/pub && cp -r shots/. /tmp/pub/ 2>/dev/null || true
+          cp mock.log /tmp/pub/ 2>/dev/null || true
+          cd /tmp/pub
+          git init -q -b tv-shots
+          git config user.name "glive-bot"; git config user.email "bot@glive.local"
+          git add -A && git commit -qm "Captures ${{ github.run_number }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" tv-shots
