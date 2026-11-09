@@ -90,3 +90,16 @@ data class Account(val server: String, val user: String, val pass: String) {
             return s
         }
 }
+
+/** Accepte une adresse de serveur ou un lien M3U complet (get.php?username=…&password=…). */
+fun parseAccountInput(server: String, user: String, pass: String): Account {
+    val raw = server.trim()
+    if (raw.contains("username=") && raw.contains("password=")) {
+        val withScheme = if (raw.startsWith("http")) raw else "http://$raw"
+        val uri = android.net.Uri.parse(withScheme)
+        val base = "${uri.scheme}://${uri.host}${if (uri.port > 0) ":${uri.port}" else ""}"
+        return Account(base, uri.getQueryParameter("username") ?: user.trim(), uri.getQueryParameter("password") ?: pass.trim())
+    }
+    val noPath = raw.substringBefore("/player_api.php").substringBefore("/get.php").trimEnd('/')
+    return Account(noPath, user.trim(), pass.trim())
+}

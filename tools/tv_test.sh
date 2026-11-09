@@ -36,6 +36,10 @@ key KEYCODE_DPAD_LEFT; key KEYCODE_DPAD_LEFT; key KEYCODE_DPAD_LEFT; key KEYCODE
 key KEYCODE_DPAD_RIGHT; key KEYCODE_DPAD_DOWN; key KEYCODE_DPAD_CENTER; shot 19_fiche_serie 6
 key KEYCODE_BACK; key KEYCODE_DPAD_LEFT; key KEYCODE_DPAD_LEFT; key KEYCODE_DPAD_LEFT; key KEYCODE_DPAD_DOWN; key KEYCODE_DPAD_DOWN; shot 20_reglages 4
 key KEYCODE_BACK; shot 21_retour_accueil 3
+key KEYCODE_DPAD_LEFT; key KEYCODE_DPAD_LEFT; key KEYCODE_DPAD_LEFT
+for k in 1 2 3 4 5 6 7 8 9; do key KEYCODE_DPAD_DOWN; done
+shot 22_reglages 3
+key KEYCODE_DPAD_RIGHT; key KEYCODE_DPAD_CENTER; shot 23_diagnostic 25
 
 adb shell dumpsys gfxinfo $PKG > $OUT/gfxinfo.txt
 adb logcat -d -v time > $OUT/logcat_full.txt

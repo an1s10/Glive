@@ -44,11 +44,11 @@ fun b64(s: String): String {
     }
 }
 
-class Xtream(val account: Account, userAgent: String) {
+class Xtream(val account: Account, val userAgent: String) {
 
     val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .addInterceptor { chain ->
@@ -87,8 +87,37 @@ class Xtream(val account: Account, userAgent: String) {
         }
     }
 
+    /** Teste un flux : code HTTP, type, et si les premiers octets ressemblent à de la vidéo. */
+    suspend fun probe(url: String, ua: String): String = withContext(Dispatchers.IO) {
+        try {
+            val client = http.newBuilder().readTimeout(12, TimeUnit.SECONDS).addInterceptor { c ->
+                c.proceed(c.request().newBuilder().header("User-Agent", ua).build())
+            }.build()
+            client.newCall(Request.Builder().url(url).header("Range", "bytes=0-4095").build()).execute().use { r ->
+                val bytes = r.body?.byteStream()?.let { input ->
+                    val buf = ByteArray(4096); var n = 0
+                    while (n < buf.size) { val k = input.read(buf, n, buf.size - n); if (k <= 0) break; n += k }
+                    buf.copyOf(n)
+                } ?: ByteArray(0)
+                val kind = when {
+                    bytes.isNotEmpty() && bytes[0] == 0x47.toByte() -> "flux TS"
+                    String(bytes.take(16).toByteArray()).startsWith("#EXTM3U") -> "playlist HLS"
+                    bytes.size > 8 && String(bytes.copyOfRange(4, 8)) == "ftyp" -> "MP4"
+                    bytes.isEmpty() -> "vide"
+                    else -> "inconnu"
+                }
+                val host = r.request.url.host
+                "HTTP ${r.code} · $kind · ${bytes.size} o · ${r.header("Content-Type") ?: "?"} · $host"
+            }
+        } catch (e: Exception) {
+            "ÉCHEC : ${e.javaClass.simpleName} ${e.message ?: ""}".take(120)
+        }
+    }
+
     // ---- URLs de lecture ----
     fun liveUrl(id: Int) = "${account.base}/live/${account.user}/${account.pass}/$id.ts"
+    fun liveUrlHls(id: Int) = "${account.base}/live/${account.user}/${account.pass}/$id.m3u8"
+    fun liveUrlBare(id: Int) = "${account.base}/${account.user}/${account.pass}/$id"
     fun movieUrl(id: Int, ext: String) = "${account.base}/movie/${account.user}/${account.pass}/$id.${ext.ifEmpty { "mp4" }}"
     fun episodeUrl(id: String, ext: String) = "${account.base}/series/${account.user}/${account.pass}/$id.${ext.ifEmpty { "mp4" }}"
 

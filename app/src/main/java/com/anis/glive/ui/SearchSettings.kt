@@ -137,6 +137,7 @@ fun SettingsSection(onLogout: () -> Unit) {
 
     LazyColumn(contentPadding = PaddingValues(40.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text("Réglages", style = T.h1) }
+        item { DiagnosticBlock() }
         item {
             Text("Thème", style = T.h2)
             Gap(8)
@@ -236,5 +237,58 @@ fun SettingsSection(onLogout: () -> Unit) {
             }
             updateMsg?.let { Text(it, style = T.small, modifier = Modifier.padding(top = 8.dp)) }
         }
+    }
+}
+
+
+@Composable
+fun DiagnosticBlock() {
+    val app = GliveApp.instance
+    val scope = rememberCoroutineScope()
+    var lines by remember { mutableStateOf(emptyList<String>()) }
+    var running by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Diagnostic", style = T.h2)
+        Text("Si quelque chose ne marche pas : lance le test, puis prends l'écran en photo pour Claude.", style = T.small)
+        Button(onClick = {
+            if (running) return@Button
+            running = true
+            lines = emptyList()
+            scope.launch {
+                fun add(l: String) { lines = lines + l }
+                add("Glive ${BuildConfig.VERSION_NAME} · Android ${android.os.Build.VERSION.RELEASE} · ${android.os.Build.MODEL}")
+                val acc = app.prefs.account
+                if (acc == null) { add("Aucun compte"); running = false; return@launch }
+                add("Serveur : ${android.net.Uri.parse(acc.base).host}:${android.net.Uri.parse(acc.base).port} · signature : ${app.prefs.userAgent.take(30)}")
+                for (ua in (listOf(app.prefs.userAgent) + com.anis.glive.data.Prefs.USER_AGENTS).distinct()) {
+                    val r = com.anis.glive.data.Xtream(acc, ua).authenticate()
+                    add("Connexion [${ua.take(18)}] : ${r ?: "OK"}")
+                    if (r == null) break
+                }
+                val c = app.repo.catalog.value
+                add("Catalogue : ${c.liveCats.size} groupes, ${c.channels.size} chaînes, ${c.movies.size} films, ${c.series.size} séries")
+                val files = java.io.File(app.filesDir, "catalog").listFiles()?.joinToString(" · ") { "${it.name} ${it.length() / 1024} Ko" } ?: "aucun"
+                add("Cache : $files")
+                add("Langues détectées : " + c.channels.groupingBy { it.lang }.eachCount().entries.sortedByDescending { it.value }.take(6).joinToString { "${it.key.name} ${it.value}" })
+                add("Exemples de groupes : " + c.liveCats.take(5).joinToString(" | ") { it.name.take(24) })
+                val x = app.repo.xtream
+                val ch = c.channels.firstOrNull { it.id == app.prefs.lastChannel } ?: c.channels.firstOrNull()
+                if (x != null && ch != null) {
+                    add("Chaîne testée : ${ch.name.take(40)} (id ${ch.id})")
+                    add("Guide : ${runCatching { x.shortEpg(ch.id).size }.getOrDefault(-1)} programmes")
+                    val uas = (listOf(app.prefs.userAgent) + com.anis.glive.data.Prefs.USER_AGENTS).distinct().take(3)
+                    for (ua in uas) {
+                        add(".ts [${ua.take(14)}] : " + x.probe(x.liveUrl(ch.id), ua))
+                        add(".m3u8 [${ua.take(14)}] : " + x.probe(x.liveUrlHls(ch.id), ua))
+                    }
+                    c.movies.firstOrNull()?.let { m -> add("Film [${m.name.take(20)}] : " + x.probe(x.movieUrl(m.id, m.ext), app.prefs.userAgent)) }
+                }
+                val crash = app.crashFile()
+                if (crash.exists()) add("Dernier plantage : " + crash.readLines().drop(2).take(2).joinToString(" "))
+                add("Fin du test")
+                running = false
+            }
+        }) { Text(if (running) "Test en cours…" else "Lancer le diagnostic") }
+        lines.forEach { Text(it, style = T.small.copy(color = C.text2), maxLines = 2, overflow = TextOverflow.Ellipsis) }
     }
 }

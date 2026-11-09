@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import com.anis.glive.GliveApp
-import com.anis.glive.data.Account
 import com.anis.glive.data.Xtream
 import kotlinx.coroutines.launch
 
@@ -54,7 +53,7 @@ fun LoginScreen(onDone: () -> Unit) {
         Column(Modifier.width(420.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Glive", style = T.hero, color = C.accent)
             Text("Connecte ton compte Xtream Codes", style = T.h2)
-            Field("Adresse du serveur (ex. http://serveur.com:8080)", server, { server = it }, Modifier.focusRequester(first), KeyboardType.Uri)
+            Field("Adresse du serveur, ou ton lien M3U complet", server, { server = it }, Modifier.focusRequester(first), KeyboardType.Uri)
             Field("Nom d'utilisateur", user, { user = it })
             Field("Mot de passe", pass, { pass = it }, password = true)
             error?.let { Text(it, style = T.body, color = C.accent) }
@@ -64,8 +63,12 @@ fun LoginScreen(onDone: () -> Unit) {
                     busy = true
                     error = null
                     scope.launch {
-                        val acc = Account(server.trim(), user.trim(), pass.trim())
-                        val err = Xtream(acc, prefs.userAgent).authenticate()
+                        val acc = com.anis.glive.data.parseAccountInput(server, user, pass)
+                        var err: String? = "Rien n'a été essayé"
+                        for (ua in listOf(prefs.userAgent) + com.anis.glive.data.Prefs.USER_AGENTS) {
+                            err = Xtream(acc, ua).authenticate()
+                            if (err == null) { prefs.userAgent = ua; break }
+                        }
                         busy = false
                         if (err == null) {
                             prefs.account = acc

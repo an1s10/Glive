@@ -67,6 +67,9 @@ import com.anis.glive.data.Channel
 import com.anis.glive.data.Program
 import kotlinx.coroutines.delay
 
+/** Signature réseau utilisée par le lecteur (null = celle des réglages). */
+object NetUA { var ua: String? = null }
+
 sealed class PlayerMode {
     data class Live(val channels: List<Channel>, val index: Int) : PlayerMode()
     data class Catchup(val channel: Channel, val program: Program) : PlayerMode()
@@ -79,11 +82,15 @@ fun rememberExoPlayer(): ExoPlayer {
     val context = LocalContext.current
     val prefs = GliveApp.instance.prefs
     val player = remember {
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(prefs.userAgent)
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(12_000)
-            .setReadTimeoutMs(20_000)
+        // Fabrique recréée à chaque ouverture de flux : elle prend la signature courante (NetUA.ua)
+        val http = androidx.media3.datasource.DataSource.Factory {
+            DefaultHttpDataSource.Factory()
+                .setUserAgent(NetUA.ua ?: prefs.userAgent)
+                .setAllowCrossProtocolRedirects(true)
+                .setConnectTimeoutMs(12_000)
+                .setReadTimeoutMs(20_000)
+                .createDataSource()
+        }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(15_000, 60_000, 1_200, 2_500)
             .build()
@@ -165,13 +172,27 @@ fun LivePlayer(channels: List<Channel>, startIndex: Int) {
     val focus = remember { FocusRequester() }
     val ch = channels.getOrNull(index)
 
+    fun candidates(c: Channel): List<Pair<String, String>> {
+        val x = app.repo.xtream!!
+        val uas = (listOf(app.prefs.userAgent) + com.anis.glive.data.Prefs.USER_AGENTS).distinct()
+        val urls = listOf(x.liveUrl(c.id), x.liveUrlHls(c.id), x.liveUrlBare(c.id))
+        return urls.map { it to uas.first() } + uas.drop(1).flatMap { ua -> listOf(x.liveUrl(c.id) to ua, x.liveUrlHls(c.id) to ua) }
+    }
+
+    fun start(c: Channel, attempt: Int) {
+        val list = candidates(c)
+        val (url, ua) = list[attempt.coerceIn(0, list.size - 1)]
+        NetUA.ua = ua
+        player.setMediaItem(MediaItem.fromUri(url))
+        player.prepare()
+        player.play()
+    }
+
     fun play(i: Int) {
         val c = channels.getOrNull(i) ?: return
         error = null
         retries = 0
-        player.setMediaItem(MediaItem.fromUri(app.repo.xtream!!.liveUrl(c.id)))
-        player.prepare()
-        player.play()
+        start(c, 0)
         app.prefs.lastChannel = c.id
         app.prefs.addRecent(c.id)
     }
@@ -202,14 +223,19 @@ fun LivePlayer(channels: List<Channel>, startIndex: Int) {
     DisposableEffect(player) {
         val l = object : Player.Listener {
             override fun onPlayerError(e: PlaybackException) {
-                if (retries < 2) {
+                val c = channels.getOrNull(index) ?: return
+                val total = candidates(c).size
+                if (retries < total - 1) {
                     retries++
-                    player.prepare()
-                    player.play()
-                } else error = e.errorCodeName
+                    start(c, retries)
+                } else error = "${e.errorCodeName} (${total} essais)"
             }
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) error = null
+                if (state == Player.STATE_READY) {
+                    error = null
+                    // La signature qui a marché devient celle par défaut
+                    NetUA.ua?.let { if (it != app.prefs.userAgent) app.prefs.userAgent = it }
+                }
             }
         }
         player.addListener(l)
@@ -385,6 +411,7 @@ fun VodPlayer(url: String, title: String, subtitle: String, resumeKey: String?, 
     val focus = remember { FocusRequester() }
 
     LaunchedEffect(url) {
+        NetUA.ua = app.prefs.userAgent
         player.setMediaItem(MediaItem.fromUri(url))
         val start = resumeKey?.let { app.prefs.resumeFor(it)?.position } ?: 0L
         player.prepare()
@@ -404,7 +431,15 @@ fun VodPlayer(url: String, title: String, subtitle: String, resumeKey: String?, 
     }
     DisposableEffect(Unit) {
         val l = object : Player.Listener {
-            override fun onPlayerError(e: PlaybackException) { error = e.errorCodeName }
+            override fun onPlayerError(e: PlaybackException) {
+                val uas = (listOf(app.prefs.userAgent) + com.anis.glive.data.Prefs.USER_AGENTS).distinct()
+                val i = uas.indexOf(NetUA.ua ?: app.prefs.userAgent)
+                if (i in 0 until uas.size - 1) {
+                    NetUA.ua = uas[i + 1]
+                    val pos = player.currentPosition
+                    player.setMediaItem(MediaItem.fromUri(url)); player.prepare(); if (pos > 0) player.seekTo(pos); player.play()
+                } else error = e.errorCodeName
+            }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) error = null
                 if (state == Player.STATE_ENDED) ended = true

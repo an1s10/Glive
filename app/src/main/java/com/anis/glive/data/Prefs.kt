@@ -21,8 +21,8 @@ class Prefs(context: Context) {
         }
 
     var userAgent: String
-        get() = sp.getString("ua", DEFAULT_UA) ?: DEFAULT_UA
-        set(v) = sp.edit().putString("ua", v).apply()
+        get() = sp.getString("ua2", DEFAULT_UA) ?: DEFAULT_UA
+        set(v) = sp.edit().putString("ua2", v).apply()
 
     var theme: String
         get() = sp.getString("theme", "bleu") ?: "bleu"
@@ -107,6 +107,13 @@ class Prefs(context: Context) {
     }
 
     companion object {
-        const val DEFAULT_UA = "Mozilla/5.0 (Linux; Android 9; AFTKA) AppleWebKit/537.36 (KHTML, like Gecko) Glive/1.0"
+        /** Beaucoup de fournisseurs filtrent les lecteurs inconnus : on essaie ces signatures dans l'ordre. */
+        val USER_AGENTS = listOf(
+            "VLC/3.0.20 LibVLC/3.0.20",
+            "okhttp/4.12.0",
+            "Mozilla/5.0 (Linux; Android 11; AFTKA) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+            "Lavf/58.76.100",
+        )
+        val DEFAULT_UA = USER_AGENTS.first()
     }
 }
